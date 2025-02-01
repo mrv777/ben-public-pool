@@ -551,17 +551,20 @@ export class StratumV1Client {
             }
 
 
-            // Submit share to API
-            await this.shareSubmissionService.submitShare({
-                worker: this.clientAuthorization.worker,
-                address: this.clientAuthorization.address,
-                difficulty: submissionDifficulty,
-                sessionId: this.extraNonceAndSessionId,
-                userAgent: this.clientSubscription.userAgent,
-                timestamp: new Date(),
-                blockHex: submissionDifficulty >= jobTemplate.blockData.networkDifficulty ? updatedJobBlock.toHex(false) : undefined,
-                header: header.toString('hex')
-            });
+            const externalShareSubmissionEnabled = this.configService.get('EXTERNAL_SHARE_SUBMISSION_ENABLED');
+            if (externalShareSubmissionEnabled) {
+                // Submit share to API if enabled
+                await this.shareSubmissionService.submitShare({
+                    worker: this.clientAuthorization.worker,
+                    address: this.clientAuthorization.address,
+                    difficulty: submissionDifficulty,
+                    sessionId: this.extraNonceAndSessionId,
+                    userAgent: this.clientSubscription.userAgent,
+                    timestamp: new Date(),
+                    blockHex: submissionDifficulty >= jobTemplate.blockData.networkDifficulty ? updatedJobBlock.toHex(false) : undefined,
+                    header: header.toString('hex')
+                });
+            }
 
         } else {
             const err = new StratumErrorMessage(
