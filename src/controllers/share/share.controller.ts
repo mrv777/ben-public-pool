@@ -9,7 +9,7 @@ import { AddressSettingsService } from '../../ORM/address-settings/address-setti
 @Controller('share')
 export class ShareController {
   private readonly apiKey: string;
-  private readonly minimumDifficulty: number = 1000000000; // 1G/B
+  private readonly minimumDifficulty: number = this.configService.get('MINIMUM_DIFFICULTY') || 1000000000000; // 1T
 
   constructor(
     private readonly configService: ConfigService,
@@ -29,11 +29,6 @@ export class ShareController {
       throw new UnauthorizedException('Invalid API key');
     }
 
-    // Validate minimum difficulty
-    if (submission.difficulty < this.minimumDifficulty) {
-      throw new UnauthorizedException('Share difficulty too low');
-    }
-
     // Validate header format
     if (!submission.header || !/^[0-9a-fA-F]+$/.test(submission.header)) {
       throw new UnauthorizedException('Invalid header format - must be a valid hex string');
@@ -45,8 +40,15 @@ export class ShareController {
     const difficulty = this.calculateDifficulty(hashResult);
 
     // Verify the calculated difficulty matches or exceeds claimed difficulty
-    if (difficulty < submission.difficulty) {
-      throw new UnauthorizedException('Invalid share - calculated difficulty does not match claimed difficulty');
+    if (difficulty < this.minimumDifficulty) {
+      throw new UnauthorizedException('Share difficulty too low');
+    }
+
+    const timestamp = headerBuffer.readUInt32LE(68);
+    const tenMinutesAgo = Math.floor(Date.now() / 1000) - (10 * 60);
+    
+    if (timestamp < tenMinutesAgo) {
+      throw new UnauthorizedException('Share timestamp too old - must be within last 10 minutes');
     }
 
     // Store the share statistics
@@ -55,12 +57,12 @@ export class ShareController {
       clientName: submission.worker,
       sessionId: submission.sessionId,
       time: new Date().getTime(),
-      shares: submission.difficulty,
+      shares: difficulty,
       acceptedCount: 1
     });
 
     // Update address settings with shares
-    await this.addressSettingsService.addShares(submission.address, submission.difficulty);
+    await this.addressSettingsService.addShares(submission.address, difficulty);
 
     // Update best difficulty if this share is better
     if (difficulty > (await this.addressSettingsService.getSettings(submission.address, true)).bestDifficulty) {
@@ -90,4 +92,4 @@ export class ShareController {
     }, BigInt(0));
     return number;
   }
-} 
+}
