@@ -34,6 +34,11 @@ export class ShareController {
       throw new UnauthorizedException('Share difficulty too low');
     }
 
+    // Validate header format
+    if (!submission.header || !/^[0-9a-fA-F]+$/.test(submission.header)) {
+      throw new UnauthorizedException('Invalid header format - must be a valid hex string');
+    }
+
     // Validate the header hash matches claimed difficulty
     const headerBuffer = Buffer.from(submission.header, 'hex');
     const hashResult = bitcoinjs.crypto.hash256(headerBuffer);
